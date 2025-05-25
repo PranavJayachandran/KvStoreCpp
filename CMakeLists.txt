@@ -23,7 +23,9 @@ include_directories(
 
 # Test executable
 add_executable(test_all 
+  tests/test_skiplist.cpp
   tests/test_memtable.cpp
+  tests/test_bloomfilter.cpp
 )
 
 target_link_libraries(test_all
