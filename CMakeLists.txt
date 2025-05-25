@@ -4,7 +4,10 @@ project(KVStore)
 set(CMAKE_CXX_STANDARD 17)
 
 # Main executable
-add_executable(KVStore src/main.cpp)
+
+file(GLOB SRC_FILES src/*.cpp)
+
+add_executable(KVStore ${SRC_FILES})
 target_include_directories(KVStore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # === Unit Testing Setup ===

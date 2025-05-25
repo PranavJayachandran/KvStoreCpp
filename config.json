@@ -1,0 +1,6 @@
+{
+  "sstDir" : "",
+  "sstKeyBlockSize": 10,
+  "sstValueBlockSize": 20
+}
+
