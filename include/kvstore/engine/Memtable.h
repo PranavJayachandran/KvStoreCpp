@@ -29,7 +29,7 @@ namespace kvstore::engine {
       }
 
       void Delete(const K& key){
-        skiplist_.Add(key, "", true);
+        skiplist_.Delete(key);
       }
 
       bool ShouldFlush(){

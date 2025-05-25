@@ -26,17 +26,7 @@ namespace kvstore::engine{
         return dist(rng);
       }
 
-    public:
-      explicit SkipList(int max_level){
-        this->max_level_ = max_level;
-        this->head_ = std::make_shared<Node>(K(), V(), max_level_, false);
-      }
-
-      // No copying
-      SkipList(const SkipList&) = delete;
-      SkipList& operator=(const SkipList&) = delete;
-
-      void Add(const K& key, const V& value, bool is_delete = false){
+      void InsertValue(const K& key, const V& value, bool is_delete){
         std::vector<std::shared_ptr<Node>>update(max_level_, nullptr);
         int current_level = 0;
         auto iterator_node = head_;
@@ -63,6 +53,24 @@ namespace kvstore::engine{
           }
         }
       }
+
+    public:
+      explicit SkipList(int max_level){
+        this->max_level_ = max_level;
+        this->head_ = std::make_shared<Node>(K(), V(), max_level_, false);
+      }
+
+      // No copying
+      SkipList(const SkipList&) = delete;
+      SkipList& operator=(const SkipList&) = delete;
+
+      void Add(const K& key, const V& value){
+        InsertValue(key, value, false);
+      }
+
+      void Delete(const K& key){
+        InsertValue(key, "", true);
+      }
       
       const V* Get(const K& key){
         int current_level = 0;
@@ -74,7 +82,7 @@ namespace kvstore::engine{
           current_level++;
         }
         iterator_node = iterator_node->next[max_level_-1];
-        return (iterator_node != nullptr && iterator_node->key == key) ? &iterator_node->value : nullptr; 
+        return (iterator_node != nullptr && iterator_node->key == key && !iterator_node->is_delete) ? &iterator_node->value : nullptr; 
       }
 
       void Print(){
