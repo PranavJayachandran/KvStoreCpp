@@ -1,8 +1,9 @@
 #include <string>
 #include <fstream>
+#include <filesystem>
 #include "../include/kvstore/engine/FileHandler.h"
 namespace kvstore::engine {
-      void FileHandler::AppendToFile(std::string file_name, std::string data){ 
+      void FileHandler::AppendToFile(const std::string &file_name, std::string &data){ 
         std::ofstream out(file_name, std::ios::app | std::ios::binary);
         if(!out)
           throw std::runtime_error("Failed to open file: " + file_name);
@@ -10,7 +11,7 @@ namespace kvstore::engine {
         out << data;
       }
 
-      std::string FileHandler::ReadFromFile(std::string file_name, int start_pos, int block_size){
+      std::string FileHandler::ReadFromFile(const std::string &file_name, int start_pos, int block_size){
         std::ifstream in(file_name, std::ios::binary);
         if(!in)
           throw std::runtime_error("Failed to open file: " + file_name);
@@ -22,7 +23,7 @@ namespace kvstore::engine {
         return buffer;
       }
 
-      void FileHandler::WriteToFile(std::string file_name, int start_pos, std::string data){
+      void FileHandler::WriteToFile(const std::string &file_name, int start_pos, std::string &data){
 
         std::ifstream infile(file_name);
         if (!infile) {
@@ -68,5 +69,9 @@ namespace kvstore::engine {
         if (std::rename(temp_file_name.c_str(), file_name.c_str()) != 0) {
           throw std::runtime_error("Failed to rename temp file");
         }      
+      }
+
+      int FileHandler::GetSize(const std::string &file_name){
+        return std::filesystem::file_size(file_name);
       }
 }
