@@ -114,7 +114,7 @@ namespace kvstore::engine{
     explicit SkipListIterator(const std::shared_ptr<Node<K,V>> &node) : head_(node), iterator_(node){}
 
     bool HasNext(){
-      return iterator_ != nullptr;
+      return iterator_!= nullptr;
     }
     std::pair<K, V> GetNext(){
       std::pair<K,V> p = {iterator_->key, iterator_->value};

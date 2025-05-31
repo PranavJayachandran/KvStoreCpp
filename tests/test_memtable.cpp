@@ -52,3 +52,27 @@ TEST(Memtable, Delete) {
   isPresent = memtable.Get("key1", val);
   EXPECT_EQ(isPresent, false);
 }
+
+TEST(MemtableIterator, Iterator_ShouldGetAllTheValues){
+  Memtable<>memtable(4);
+
+  memtable.Add("key2", "value2");
+  memtable.Add("key1", "value1");
+  memtable.Add("key4", "value4");
+  memtable.Add("key3", "value3");
+
+  kvstore::engine::MemtableIterator<> iterator = memtable.GetMemtableITerator();
+  std::vector<std::pair<std::string,std::string>> p;
+  while(iterator.HasNext()){
+    p.push_back(iterator.GetNext()); 
+  }  
+  ASSERT_EQ(p.size(), 4);
+  EXPECT_EQ(p[0].first, "key1");
+  EXPECT_EQ(p[0].second, "value1");
+  EXPECT_EQ(p[1].first, "key2");
+  EXPECT_EQ(p[1].second, "value2");
+  EXPECT_EQ(p[2].first, "key3");
+  EXPECT_EQ(p[2].second, "value3");
+  EXPECT_EQ(p[3].first, "key4");
+  EXPECT_EQ(p[3].second, "value4");
+}

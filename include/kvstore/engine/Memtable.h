@@ -2,6 +2,10 @@
 #include "SkipList.h"
 #include <string>
 namespace kvstore::engine {
+
+  template <typename K = std::string, typename V = std::string>
+  class MemtableIterator;
+
   template <typename K = std::string, typename V = std::string>
   class Memtable{
     private:
@@ -16,7 +20,6 @@ namespace kvstore::engine {
       void Add(const K& key, const V& value){
         skiplist_.Add(key, value);
         current_size_ += sizeof(key) + sizeof(value);
-        skiplist_.Print();
       }
       
       bool Get(const K& key, V& out_value){
@@ -34,6 +37,25 @@ namespace kvstore::engine {
 
       bool ShouldFlush(){
         return current_size_ < max_size_;
+      }
+
+      MemtableIterator<K,V> GetMemtableITerator(){
+        return MemtableIterator<K,V>(skiplist_.GetSkipListIterator());
+      }
+  };
+
+  template <typename K, typename V>
+  class MemtableIterator{
+    private:
+      SkipListIterator<K,V> skip_list_iterator_;
+    public:
+      explicit MemtableIterator(SkipListIterator<K,V> skip_list_iterator) : skip_list_iterator_(skip_list_iterator){} 
+      bool HasNext(){
+        return skip_list_iterator_.HasNext();
+      }
+
+      std::pair<K,V> GetNext(){
+        return skip_list_iterator_.GetNext();
       }
   };
 }
