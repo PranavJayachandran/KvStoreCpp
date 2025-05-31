@@ -19,6 +19,9 @@ namespace kvstore::engine{
       };
 
   template <typename K = std::string, typename V = std::string>
+  class SkipListIterator;
+
+  template <typename K = std::string, typename V = std::string>
   class SkipList{
     private:
       int max_level_;
@@ -87,6 +90,10 @@ namespace kvstore::engine{
         return (iterator_node != nullptr && iterator_node->key == key && !iterator_node->is_delete) ? &iterator_node->value : nullptr; 
       }
 
+      SkipListIterator<K, V> GetSkipListIterator(){
+        return SkipListIterator<K, V>(head_->next[0]);
+      }
+
       void Print(){
         for(int i=0;i<max_level_;i++){
           auto iterator_node = head_;
@@ -100,14 +107,23 @@ namespace kvstore::engine{
   };
 
   template  <typename K, typename V>
-  class SKipListIterator{
+  class SkipListIterator{
     private:
-    std::shared_ptr<Node<K,V>> head_;
+    std::shared_ptr<Node<K,V>> head_, iterator_;
     public:
-    explicit SKipListIterator(Node<K,V> &node) : head_(node){}
+    explicit SkipListIterator(const std::shared_ptr<Node<K,V>> &node) : head_(node), iterator_(node){}
 
+    bool HasNext(){
+      return iterator_ != nullptr;
+    }
     std::pair<K, V> GetNext(){
-      return {};
+      std::pair<K,V> p = {iterator_->key, iterator_->value};
+      iterator_ = iterator_->next[0];
+      return p;
+    }
+
+    void Reset(){
+      iterator_ = head_;
     }
   };
 }
