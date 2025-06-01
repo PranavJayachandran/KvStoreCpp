@@ -1,5 +1,6 @@
 #include <string>
 #include "../config/Config.h"
+#include "Memtable.h"
 #include "FileHandler.h"
 
 namespace kvstore::engine {
@@ -64,6 +65,17 @@ namespace kvstore::engine {
       }
 
     public:
+      void Flush(MemtableIterator<K,V> memtableIterator, std::string file_name){
+        std::string data_to_write = "";
+        while(memtableIterator.HasNext()){
+          std::tuple<K,V,bool> data = memtableIterator.GetNext();
+          std::string fixed_key = FixSize(std::get<0>(data), sst_key_block_size);
+          std::string fixed_value = FixSize(std::get<1>(data), sst_value_block_size);
+          data_to_write +=  fixed_key + fixed_value + (std::get<2>(data) ? '1' : '0');
+        }
+        FileHandler::WriteToFile(file_name, 0, data_to_write);
+      }
+
       void Add(const K&key, const V& value, bool isDelete = false){
         std::string fixed_key = FixSize(key, sst_key_block_size);
         std::string fixed_value = FixSize(value, sst_value_block_size);

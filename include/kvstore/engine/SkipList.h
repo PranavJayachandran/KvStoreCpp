@@ -116,8 +116,8 @@ namespace kvstore::engine{
     bool HasNext(){
       return iterator_!= nullptr;
     }
-    std::pair<K, V> GetNext(){
-      std::pair<K,V> p = {iterator_->key, iterator_->value};
+    std::tuple<K, V, bool> GetNext(){
+      std::tuple<K,V,bool> p = {iterator_->key, iterator_->value, iterator_->is_delete};
       iterator_ = iterator_->next[0];
       return p;
     }

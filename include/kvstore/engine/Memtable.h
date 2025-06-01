@@ -54,7 +54,7 @@ namespace kvstore::engine {
         return skip_list_iterator_.HasNext();
       }
 
-      std::pair<K,V> GetNext(){
+      std::tuple<K,V,bool> GetNext(){
         return skip_list_iterator_.GetNext();
       }
   };
