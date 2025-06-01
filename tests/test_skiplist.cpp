@@ -1,5 +1,6 @@
 #include "../include/kvstore/engine/SkipList.h"
 #include <gtest/gtest.h>
+#include <tuple>
 
 using kvstore::engine::SkipList;
 
@@ -47,3 +48,27 @@ TEST(SkipListTest, Delete) {
   EXPECT_EQ(val1, nullptr); 
 }
 
+
+TEST(SkipListTest, Iterator_ShouldGetAllTheValues){
+  SkipList<>list(4);
+  list.Add("key1","value1");
+  list.Add("key2","value2");
+  list.Add("key3","value3");
+
+  kvstore::engine::SkipListIterator<> iterator = list.GetSkipListIterator();
+  std::vector<std::tuple<std::string,std::string, bool>> p;
+  while(iterator.HasNext()){
+    p.push_back(iterator.GetNext());
+  }
+
+  ASSERT_EQ(p.size(), 3);
+  EXPECT_EQ(std::get<0>(p[0]), "key1");
+  EXPECT_EQ(std::get<1>(p[0]), "value1");
+  EXPECT_EQ(std::get<2>(p[0]), false);
+  EXPECT_EQ(std::get<0>(p[1]), "key2");
+  EXPECT_EQ(std::get<1>(p[1]), "value2");
+  EXPECT_EQ(std::get<2>(p[1]), false);
+  EXPECT_EQ(std::get<0>(p[2]), "key3");
+  EXPECT_EQ(std::get<1>(p[2]), "value3");
+  EXPECT_EQ(std::get<2>(p[2]), false);
+}
