@@ -76,18 +76,6 @@ namespace kvstore::engine {
         FileHandler::WriteToFile(file_name, 0, data_to_write);
       }
 
-      void Add(const K&key, const V& value, bool isDelete = false){
-        std::string fixed_key = FixSize(key, sst_key_block_size);
-        std::string fixed_value = FixSize(value, sst_value_block_size);
-        int index = -1;
-        bool isPresent = Search(fixed_key, index);
-        if(!isPresent){
-          index = GetInsertPosition(fixed_key);
-        }
-        std::string data_to_write =  fixed_key + fixed_value + (isDelete ? '1' : '0');
-        FileHandler::WriteToFile(sst, index * (sst_value_block_size + sst_key_block_size + 1), data_to_write);
-      }
-
       bool Get(const K& key, V& out_value){
         std::string fixed_key = FixSize(key, sst_key_block_size);
         int index = -1;
@@ -104,10 +92,6 @@ namespace kvstore::engine {
         out_value = data.substr(0, data.size()-1);
         out_value.erase(out_value.find_last_not_of('\0') + 1);
         return true;
-      }
-
-      void Delete(const K& key){
-        Add(key, "", true);
       }
   };
 }
