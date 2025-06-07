@@ -41,6 +41,7 @@ TEST_F(SSTTest, WhenNoKeyPresent_ShouldReturnFalse) {
 std::string Pad(const std::string& input, int size) {
   return input + std::string(size - input.size(), '\0');
 }
+
 TEST(SSTTestFlush, Flush_ShouldWriteToFile){
   kvstore::engine::Memtable<>memtable(4);
   memtable.Add("key2", "value2");
@@ -51,7 +52,8 @@ TEST(SSTTestFlush, Flush_ShouldWriteToFile){
 
   kvstore::engine::SST<> sst;
   std::string file_name = "some_file_name.txt";
-  sst.Flush(memtable.GetMemtableITerator(), file_name);
+  sst.Flush(memtable.GetMemtableITerator()); 
+
   std::ifstream file(file_name);
   std::string data;
   file >> data;
@@ -61,6 +63,7 @@ TEST(SSTTestFlush, Flush_ShouldWriteToFile){
   expected_data += Pad("key3", 10) + Pad("", 20) + "1";
   expected_data += Pad("key4", 10) + Pad("value4", 20) + "0";
   EXPECT_EQ(data,expected_data);
+
   std::remove(file_name.c_str());
 }
 

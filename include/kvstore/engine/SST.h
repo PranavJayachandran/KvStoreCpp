@@ -1,4 +1,7 @@
 #include <string>
+#include <ctime>
+#include <queue>
+#include <unordered_set>
 #include "../config/Config.h"
 #include "Memtable.h"
 #include "FileHandler.h"
@@ -7,9 +10,25 @@ namespace kvstore::engine {
   template <typename K = std::string, typename V = std::string>
   class SST{
     private:
+      class Data{
+        public:
+        K key;
+        V value;
+        bool is_deleted = false;
+        std::string file_name;
+
+        bool operator < (const Data &other) const {
+          // In case the keys are same the, one which was added later is the more correct one. File nane is utc now.
+          if(other.key == key){
+            return file_name > other.file_name;
+          }
+          return key < other.key;
+        }
+      };
       const std::string directory_name = config::GetConfig().sst_dir; 
       const int sst_key_block_size = config::GetConfig().sst_key_block_size;
       const int sst_value_block_size = config::GetConfig().sst_value_block_size;
+      const std::vector<std::string> sst_level_directories = config::GetConfig().sst_level_folders;
       const std::string sst = "sst.txt";
 
       bool Search(const K&key, int& out_index){
@@ -64,8 +83,105 @@ namespace kvstore::engine {
         return value;
       }
 
+      std::string GetSstFileName(){
+        std::time_t now = std::time(nullptr);
+        return std::to_string(now) + ".txt";
+      }
+
+      std::string GetKeyFromString(const std::string &buffer){
+              int i = 0;
+              std::string key = "";
+              while( i < sst_key_block_size ){
+                if(buffer[i] == '\0')
+                    break;
+                key += buffer[i];
+                i++;
+              }
+              return key;
+      }
+
+      std::string GetValueFromString(const std::string &buffer){
+              int i = sst_key_block_size;
+              std::string value = "";
+              while( i < sst_key_block_size + sst_value_block_size ){
+                if(buffer[i] == '\0')
+                    break;
+                value += buffer[i];
+                i++;
+              }
+              return value;
+      }
+
+      bool IsTombstoneEntry(const std::string &buffer){
+        return buffer[sst_key_block_size + sst_value_block_size] == '1';
+      }
+
+      Data GetDataFromString(const std::string &buffer, const std::string &file_name){
+              Data d;
+              d.key = GetKeyFromString(buffer);
+              d.value = GetValueFromString(buffer);
+              d.is_deleted = IsTombstoneEntry(buffer);
+              d.file_name = file_name;
+              return d;
+      }
+
+      std::pair<std::string,std::string> GetStartAndEndKeys(std::vector<FileHandler::FileStream> &files){
+        std::string start = "", end = "";
+        for(int i=0;i<files.size();i++){
+          files[i].stream->clear();
+          files[i].stream->seekg(0);
+          std::string key(sst_key_block_size, '\0');
+          files[i].stream->read(&key[0], sst_key_block_size);
+          std::cout<<files[i].file_name<<" "<<key<<"\n";
+          if(start.size() == 0)
+              start = key;
+          start = min(start, key);
+          end = max(end, key);
+          files[i].stream->clear();
+          files[i].stream->seekg(- (sst_key_block_size + sst_value_block_size + 1), std::ios::end);
+          files[i].stream->read(&key[0], sst_key_block_size);
+
+          start = min(start, key);
+          end = max(end, key);
+        }
+        return {start,end};
+      }
+
+      void Level0Compaction(){
+
+        //Get the pointers to all the files in level0
+        std::vector<FileHandler::FileStream> files_in_level0 = FileHandler::GetPointersToAllFiles(directory_name + "/" + sst_level_directories[0]);
+        std::priority_queue<std::pair<Data, int>, std::vector<std::pair<Data,int>>, std::greater<std::pair<Data,int>>> level0_data;
+        for(int i = 0; i < files_in_level0.size(); i++){
+          if(files_in_level0[i].stream->is_open()){
+            std::string buffer(sst_key_block_size + sst_value_block_size + 1, '\0');
+            files_in_level0[i].stream->read(&buffer[0], buffer.size());
+            if(files_in_level0[i].stream->gcount() == sst_key_block_size + sst_value_block_size + 1){
+              level0_data.push({GetDataFromString(buffer, files_in_level0[i].file_name), i});
+            }
+          }
+        }
+        std::unordered_set<std::string> taken_values;
+        while(!level0_data.empty()){
+          std::pair<Data, int> data = level0_data.top();
+          level0_data.pop();
+          if(taken_values.find(data.first.key) == taken_values.end())
+            std::cout<<data.first.key<<" "<<data.first.value<<"\n";
+          taken_values.insert(data.first.key);
+          std::string buffer(sst_key_block_size + sst_value_block_size + 1, '\0');
+          files_in_level0[data.second].stream->read(&buffer[0], buffer.size());
+          if(files_in_level0[data.second].stream->gcount() == sst_key_block_size + sst_value_block_size + 1){
+              level0_data.push({GetDataFromString(buffer, files_in_level0[data.second].file_name), data.second});
+          }
+        }
+
+        // Find the lowest and highest keys from level0 to select files from level1 that they would be merged into.
+        std::pair<std::string, std::string> start_end = GetStartAndEndKeys(files_in_level0);
+        std::cout<<start_end.first<<" "<<start_end.second;
+      }
+
     public:
-      void Flush(MemtableIterator<K,V> memtableIterator, std::string file_name){
+      void Flush(MemtableIterator<K,V> memtableIterator){
         std::string data_to_write = "";
         while(memtableIterator.HasNext()){
           std::tuple<K,V,bool> data = memtableIterator.GetNext();
@@ -73,7 +189,18 @@ namespace kvstore::engine {
           std::string fixed_value = FixSize(std::get<1>(data), sst_value_block_size);
           data_to_write +=  fixed_key + fixed_value + (std::get<2>(data) ? '1' : '0');
         }
-        FileHandler::WriteToFile(file_name, 0, data_to_write);
+        FileHandler::WriteToFile( directory_name + "/" + sst_level_directories[0] +"/" + GetSstFileName(), data_to_write);
+
+        std::string folder_name = directory_name + "/" + sst_level_directories[0];
+        int file_count = FileHandler::GetNumberofFiles(folder_name);
+        if (file_count > 1){
+          Compaction();
+        }
+      }
+
+      // Level 0 compaction should be a single merge and then write.
+      void Compaction(){
+        Level0Compaction();
       }
 
       bool Get(const K& key, V& out_value){

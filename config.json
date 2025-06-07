@@ -1,6 +1,7 @@
 {
-  "sstDir" : "",
+  "sstDir" : "/home/pranj/code/cpp/kvstore/sst",
   "sstKeyBlockSize": 10,
-  "sstValueBlockSize": 20
+  "sstValueBlockSize": 20,
+  "sstLevelFolders": ["level0", "level1", "level2"]
 }
 

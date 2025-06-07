@@ -1,6 +1,8 @@
 #include <string>
+#include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <algorithm>
 #include "../include/kvstore/engine/FileHandler.h"
 namespace kvstore::engine {
       void FileHandler::AppendToFile(const std::string &file_name, std::string &data){ 
@@ -23,55 +25,46 @@ namespace kvstore::engine {
         return buffer;
       }
 
-      void FileHandler::WriteToFile(const std::string &file_name, int start_pos, std::string &data){
-
-        std::ifstream infile(file_name);
-        if (!infile) {
-          std::ofstream outfile(file_name); 
-          outfile.close();
+      void FileHandler::WriteToFile(const std::string &file_name, std::string &data) {
+        std::filesystem::path file_path(file_name);
+        std::filesystem::create_directories(file_path.parent_path()); 
+        std::ofstream out(file_name); // This creates/truncates the file
+        if (!out.is_open()) {
+          throw std::runtime_error("Unable to open file: " + file_name);
         }
-        std::string temp_file_name = file_name + ".tmp";
-
-        std::ifstream original(file_name, std::ios::binary); 
-        if(!original)
-          throw std::runtime_error("failed to open file: " + file_name);
-
-        std::ofstream temp(temp_file_name, std::ios::binary | std::ios::out);
-        if(!temp)
-          throw std::runtime_error("failed to open file: " + temp_file_name);
-        
-        const size_t buffer_size = 4096;
-        char buffer[buffer_size];
-        std::streampos bytes_to_copy = start_pos;
-        while(bytes_to_copy > 0){
-          std::streamsize chunk = (bytes_to_copy > static_cast<std::streampos>(buffer_size)) ? buffer_size : static_cast<std::streamsize>(bytes_to_copy);
-          original.read(buffer, chunk);
-          temp.write(buffer,chunk);
-          bytes_to_copy -= chunk;
-        }
-
-        temp.write(data.data(), data.size());
-
-        while(original){
-          original.read(buffer, buffer_size);
-          std::streamsize s = original.gcount();
-          if(s > 0){
-            temp.write(buffer,s);
-          }
-        }
-
-        original.close();
-        temp.close();
-
-        if (std::remove(file_name.c_str()) != 0) {
-          throw std::runtime_error("Failed to remove original file");
-        }
-        if (std::rename(temp_file_name.c_str(), file_name.c_str()) != 0) {
-          throw std::runtime_error("Failed to rename temp file");
-        }      
+        out << data;
+        out.close(); 
       }
 
       int FileHandler::GetSize(const std::string &file_name){
         return std::filesystem::file_size(file_name);
+      }
+
+      int FileHandler::GetNumberofFiles(std::string &folder_name) {
+        int count = 0;
+        for (const auto &entry : std::filesystem::directory_iterator(folder_name)) {
+          if (std::filesystem::is_regular_file(entry.status())) {
+              ++count;
+          }
+        }
+        return count;
+      } 
+
+      std::vector<FileHandler::FileStream> FileHandler::GetPointersToAllFiles(const std::string &folder_name){
+        std::vector<FileStream> streams;
+        for(const auto &entry : std::filesystem::directory_iterator(folder_name)){
+          if(entry.is_regular_file()){
+            auto file_stream = std::make_unique<std::ifstream>(entry.path(), std::ios::binary);
+            if (file_stream->is_open()) {
+              FileHandler::FileStream fs;
+              fs.file_name = entry.path().string();
+              fs.stream = std::move(file_stream);
+              streams.push_back(std::move(fs));
+            } else {
+              std::cerr << "Failed to open file: " << entry.path() << '\n';
+            }
+          }
+        }
+        return streams;
       }
 }
