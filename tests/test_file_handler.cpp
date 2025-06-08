@@ -45,17 +45,12 @@ TEST_F(FileHandlerTest, ReadFromFile_ReadsCorrectSubstring) {
   EXPECT_EQ(data, "llo W");
 }
 
-TEST_F(FileHandlerTest, WriteToFile_WritesAtCorrectOffset) {
-  {
-    std::ofstream out(test_file, std::ios::binary);
-    out << "11 13 14";
-  }
-
+TEST_F(FileHandlerTest, WriteToFile_WritesToTheFile) {
   std::string val = "12 ";
-  FileHandler::WriteToFile(test_file, 3, val);
+  FileHandler::WriteToFile(test_file, val);
 
   std::string content = ReadWholeFile();
-  EXPECT_EQ(content, "11 12 13 14");
+  EXPECT_EQ(content, "12");
 }
 
 TEST_F(FileHandlerTest, GetSize_ReturnsCorrectSize) {

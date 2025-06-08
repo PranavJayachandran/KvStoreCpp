@@ -1,6 +1,8 @@
 #include <string>
+#include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <cstdio>
 #include "../include/kvstore/engine/FileHandler.h"
 namespace kvstore::engine {
       void FileHandler::AppendToFile(const std::string &file_name, std::string &data){ 
@@ -23,55 +25,79 @@ namespace kvstore::engine {
         return buffer;
       }
 
-      void FileHandler::WriteToFile(const std::string &file_name, int start_pos, std::string &data){
-
-        std::ifstream infile(file_name);
-        if (!infile) {
-          std::ofstream outfile(file_name); 
-          outfile.close();
+      void FileHandler::WriteToFile(const std::string &file_name, std::string &data) {
+        std::filesystem::path file_path(file_name);
+        std::filesystem::create_directories(file_path.parent_path()); 
+        std::ofstream out(file_name); // This creates/truncates the file
+        if (!out.is_open()) {
+          throw std::runtime_error("Unable to open file: " + file_name);
         }
-        std::string temp_file_name = file_name + ".tmp";
+        out << data;
+        out.close(); 
+      }
 
-        std::ifstream original(file_name, std::ios::binary); 
-        if(!original)
-          throw std::runtime_error("failed to open file: " + file_name);
-
-        std::ofstream temp(temp_file_name, std::ios::binary | std::ios::out);
-        if(!temp)
-          throw std::runtime_error("failed to open file: " + temp_file_name);
-        
-        const size_t buffer_size = 4096;
-        char buffer[buffer_size];
-        std::streampos bytes_to_copy = start_pos;
-        while(bytes_to_copy > 0){
-          std::streamsize chunk = (bytes_to_copy > static_cast<std::streampos>(buffer_size)) ? buffer_size : static_cast<std::streamsize>(bytes_to_copy);
-          original.read(buffer, chunk);
-          temp.write(buffer,chunk);
-          bytes_to_copy -= chunk;
+      void FileHandler::DeleteFile(const std::string &file_name){
+        if (std::remove(&file_name[0]) != 0){
+          std::cerr<<"Failed to delete" + file_name;
         }
-
-        temp.write(data.data(), data.size());
-
-        while(original){
-          original.read(buffer, buffer_size);
-          std::streamsize s = original.gcount();
-          if(s > 0){
-            temp.write(buffer,s);
-          }
-        }
-
-        original.close();
-        temp.close();
-
-        if (std::remove(file_name.c_str()) != 0) {
-          throw std::runtime_error("Failed to remove original file");
-        }
-        if (std::rename(temp_file_name.c_str(), file_name.c_str()) != 0) {
-          throw std::runtime_error("Failed to rename temp file");
-        }      
       }
 
       int FileHandler::GetSize(const std::string &file_name){
         return std::filesystem::file_size(file_name);
+      }
+
+      int FileHandler::GetNumberofFiles(std::string &folder_name) {
+        int count = 0;
+        for (const auto &entry : std::filesystem::directory_iterator(folder_name)) {
+          if (std::filesystem::is_regular_file(entry.status())) {
+              ++count;
+          }
+        }
+        return count;
+      } 
+
+      std::vector<std::string> FileHandler::GetAllFileNames(const std::string &folder_name){
+        std::vector<std::string> file_names;
+        for(const auto &entry : std::filesystem::directory_iterator(folder_name)){
+          if(entry.is_regular_file()){
+            file_names.push_back(entry.path().filename().string());
+          }
+        }
+        return file_names;
+      }
+
+      FileHandler::FileStream FileHandler::GetPointerToFile(const std::string &file_name){
+        auto file_stream = std::make_unique<std::ifstream>(file_name, std::ios::binary);
+        if(file_stream->is_open()){
+          FileHandler::FileStream fs;
+          fs.file_name = file_name,
+          fs.stream = std::move(file_stream);
+          return fs;
+        }
+        else{
+          std::cerr<<"Failed to open file: "<<file_name<<"\n";
+        }
+      }
+
+      std::vector<FileHandler::FileStream> FileHandler::GetPointersToAllFiles(const std::string &folder_name){
+        std::vector<FileStream> streams;
+        if (!std::filesystem::exists(folder_name) || !std::filesystem::is_directory(folder_name)) {
+          std::cerr << "Path is not a valid directory: " << folder_name << '\n';
+          return streams;
+        }
+        for(const auto &entry : std::filesystem::directory_iterator(folder_name)){
+          if(entry.is_regular_file()){
+            auto file_stream = std::make_unique<std::ifstream>(entry.path(), std::ios::binary);
+            if (file_stream->is_open()) {
+              FileHandler::FileStream fs;
+              fs.file_name = entry.path().string();
+              fs.stream = std::move(file_stream);
+              streams.push_back(std::move(fs));
+            } else {
+              std::cerr << "Failed to open file: " << entry.path() << '\n';
+            }
+          }
+        }
+        return streams;
       }
 }
