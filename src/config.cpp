@@ -13,6 +13,8 @@ namespace kvstore::config {
     size_t sst_key_block_size;
     size_t sst_value_block_size;
     std::vector<std::string> sst_level_folders;
+    std::vector<int> sst_number_of_files_per_level, sst_size_of_file_per_level;
+    int sst_level_count;
   };
 
   static Config globalConfig;
@@ -33,7 +35,10 @@ namespace kvstore::config {
       j["sstDir"].get<std::string>(),
       j["sstKeyBlockSize"].get<size_t>(),
       j["sstValueBlockSize"].get<size_t>(),
-      j["sstLevelFolders"].get<std::vector<std::string>>()
+      j["sstLevelFolders"].get<std::vector<std::string>>(),
+      j["sstNumberOfFilesPerLevel"].get<std::vector<int>>(),
+      j["sstSizeOfFilePerLevel"].get<std::vector<int>>(),
+      j["sstLevelCount"].get<int>()
     };
   }
 

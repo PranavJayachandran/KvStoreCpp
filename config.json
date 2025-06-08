@@ -2,6 +2,9 @@
   "sstDir" : "/home/pranj/code/cpp/kvstore/sst",
   "sstKeyBlockSize": 10,
   "sstValueBlockSize": 20,
-  "sstLevelFolders": ["level0", "level1", "level2"]
+  "sstLevelFolders": ["level0", "level1", "level2"],
+  "sstNumberOfFilesPerLevel": [2, 2, 100],
+  "sstSizeOfFilePerLevel": [100, 200, 300],
+  "sstLevelCount": 2
 }
 

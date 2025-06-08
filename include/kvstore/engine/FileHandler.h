@@ -30,6 +30,10 @@ namespace kvstore::engine {
 
       static int GetNumberofFiles(std::string &folder_name);
       
+      static std::vector<std::string> GetAllFileNames(const std::string &folder_name);
+
+      static FileStream GetPointerToFile(const std::string &file_name);
+      
       static std::vector<FileStream> GetPointersToAllFiles(const std::string &folder_name);
   };
 }

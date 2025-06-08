@@ -2,7 +2,6 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
-#include <algorithm>
 #include <cstdio>
 #include "../include/kvstore/engine/FileHandler.h"
 namespace kvstore::engine {
@@ -56,6 +55,29 @@ namespace kvstore::engine {
         }
         return count;
       } 
+
+      std::vector<std::string> FileHandler::GetAllFileNames(const std::string &folder_name){
+        std::vector<std::string> file_names;
+        for(const auto &entry : std::filesystem::directory_iterator(folder_name)){
+          if(entry.is_regular_file()){
+            file_names.push_back(entry.path().filename().string());
+          }
+        }
+        return file_names;
+      }
+
+      FileHandler::FileStream FileHandler::GetPointerToFile(const std::string &file_name){
+        auto file_stream = std::make_unique<std::ifstream>(file_name, std::ios::binary);
+        if(file_stream->is_open()){
+          FileHandler::FileStream fs;
+          fs.file_name = file_name,
+          fs.stream = std::move(file_stream);
+          return fs;
+        }
+        else{
+          std::cerr<<"Failed to open file: "<<file_name<<"\n";
+        }
+      }
 
       std::vector<FileHandler::FileStream> FileHandler::GetPointersToAllFiles(const std::string &folder_name){
         std::vector<FileStream> streams;
