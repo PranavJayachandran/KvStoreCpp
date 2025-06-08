@@ -3,6 +3,7 @@
 #include <fstream>
 #include <filesystem>
 #include <algorithm>
+#include <cstdio>
 #include "../include/kvstore/engine/FileHandler.h"
 namespace kvstore::engine {
       void FileHandler::AppendToFile(const std::string &file_name, std::string &data){ 
@@ -36,6 +37,12 @@ namespace kvstore::engine {
         out.close(); 
       }
 
+      void FileHandler::DeleteFile(const std::string &file_name){
+        if (std::remove(&file_name[0]) != 0){
+          std::cerr<<"Failed to delete" + file_name;
+        }
+      }
+
       int FileHandler::GetSize(const std::string &file_name){
         return std::filesystem::file_size(file_name);
       }
@@ -52,6 +59,10 @@ namespace kvstore::engine {
 
       std::vector<FileHandler::FileStream> FileHandler::GetPointersToAllFiles(const std::string &folder_name){
         std::vector<FileStream> streams;
+        if (!std::filesystem::exists(folder_name) || !std::filesystem::is_directory(folder_name)) {
+          std::cerr << "Path is not a valid directory: " << folder_name << '\n';
+          return streams;
+        }
         for(const auto &entry : std::filesystem::directory_iterator(folder_name)){
           if(entry.is_regular_file()){
             auto file_stream = std::make_unique<std::ifstream>(entry.path(), std::ios::binary);
