@@ -26,9 +26,11 @@ namespace kvstore::engine {
 
       static void DeleteFile(const std::string &file_name);
 
+      static void CreateFile(const std::string &folder_name, const std::string &file_name);
+
       static int GetSize(const std::string &file_name);
 
-      static int GetNumberofFiles(std::string &folder_name);
+      static int GetNumberofFiles(const std::string &folder_name);
       
       static std::vector<std::string> GetAllFileNames(const std::string &folder_name);
 

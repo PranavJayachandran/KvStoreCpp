@@ -15,6 +15,7 @@ namespace kvstore::config {
     std::vector<std::string> sst_level_folders;
     std::vector<int> sst_number_of_files_per_level, sst_size_of_file_per_level;
     int sst_level_count;
+    std::string wal_dir;
   };
 
   static Config globalConfig;
@@ -38,7 +39,8 @@ namespace kvstore::config {
       j["sstLevelFolders"].get<std::vector<std::string>>(),
       j["sstNumberOfFilesPerLevel"].get<std::vector<int>>(),
       j["sstSizeOfFilePerLevel"].get<std::vector<int>>(),
-      j["sstLevelCount"].get<int>()
+      j["sstLevelCount"].get<int>(),
+      j["walDir"].get<std::string>()
     };
   }
 
