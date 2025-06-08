@@ -25,6 +25,10 @@ namespace kvstore::engine {
         return buffer;
       }
 
+      void FileHandler::CreateFile(const std::string &folder_name, const std::string &file_name){
+        std::ofstream out(folder_name + "/" + file_name);
+      }
+
       void FileHandler::WriteToFile(const std::string &file_name, std::string &data) {
         std::filesystem::path file_path(file_name);
         std::filesystem::create_directories(file_path.parent_path()); 
@@ -46,7 +50,7 @@ namespace kvstore::engine {
         return std::filesystem::file_size(file_name);
       }
 
-      int FileHandler::GetNumberofFiles(std::string &folder_name) {
+      int FileHandler::GetNumberofFiles(const std::string &folder_name) {
         int count = 0;
         for (const auto &entry : std::filesystem::directory_iterator(folder_name)) {
           if (std::filesystem::is_regular_file(entry.status())) {
