@@ -10,7 +10,7 @@ A **SkipList** is used to store data in memory (although an **RBTree** implement
 **Sorted String Tables (SSTables)** are used to store data on disk. Since the data is sorted, it allows for faster querying. Each entry is saved in a key-value format (with a **#** suffix if the key was soft-deleted). Every entry is allocated a fixed size (configured to 30 bytes in the code). Because of this fixed-size layout, **binary search** can be used to significantly speed up lookups.
 
 ##### **Compaction**
-When the **Memtable** reaches a certain size `n`, keeping all data in memory becomes inefficient. At this point, the data is flushed to **SSTables** on disk. Specifically, the data is written to a **Level 1 SSTable**. If **Level 1** is full, a portion of its data is pushed to **Level 2**, and this process continues recursively through higher levels until the last level (**Level n**) is reached.
+When the **Memtable** reaches a certain size `n`, keeping all data in memory becomes inefficient. At this point, the data is flushed to **SSTables** on disk. Specifically, the data is written to a **Level 0 SSTable**. If **Level 0** is full, it is mergerged into **Level1**. If subsequent levels become full,  a portion of its data is pushed to next level.
 
 ##### **Bloom Filters**
 **Bloom filters** are probabilistic data structures used to check whether a given key is part of a set. If a **Bloom filter** returns "**yes**", the key might be present; if it returns "**no**", the key is definitely not present.  
