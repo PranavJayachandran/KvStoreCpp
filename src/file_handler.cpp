@@ -31,8 +31,11 @@ namespace kvstore::engine {
 
       void FileHandler::WriteToFile(const std::string &file_name, std::string &data) {
         std::filesystem::path file_path(file_name);
-        std::filesystem::create_directories(file_path.parent_path()); 
-        std::ofstream out(file_name); // This creates/truncates the file
+        auto parent = file_path.parent_path();
+        if(!parent.empty()){
+          std::filesystem::create_directories(file_path.parent_path()); 
+        }
+        std::ofstream out(file_name);
         if (!out.is_open()) {
           throw std::runtime_error("Unable to open file: " + file_name);
         }
