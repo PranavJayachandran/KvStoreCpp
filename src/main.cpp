@@ -9,8 +9,13 @@ int main(){
   kvstore::config::LoadFromFile("../config.json");
   auto memtable = std::make_unique<kvstore::engine::Memtable<>>(4);
   kvstore::engine::SST<> sst;
-  std::string value;
-  if(memtable->Get("key88",value)){
-    std::cout<<value<<"\n";
+
+  memtable->Add("key88", "value100");
+  memtable->Add("key4", "value5");
+  memtable->Add("key2", "value5");
+  memtable->Add("a123123", "value3");
+  if(memtable->ShouldFlush()){
+    sst.Flush(memtable->GetMemtableITerator());
+    memtable = std::make_unique<kvstore::engine::Memtable<>>(4);
   }
 }

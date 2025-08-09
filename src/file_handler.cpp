@@ -83,6 +83,8 @@ namespace kvstore::engine {
         }
         else{
           std::cerr<<"Failed to open file: "<<file_name<<"\n";
+          FileHandler::FileStream fs;
+          return fs;
         }
       }
 
