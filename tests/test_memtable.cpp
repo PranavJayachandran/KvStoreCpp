@@ -5,6 +5,7 @@
 using kvstore::engine::Memtable;
 
 TEST(MemtableTest, Insert){
+    kvstore::config::LoadFromFile("../config.json");
     Memtable<std::string,std::string> memtable(10);
     memtable.Add("key1", "value1");
     memtable.Add("key2", "value2");
@@ -25,6 +26,7 @@ TEST(MemtableTest, Insert){
 }
 
 TEST(Memtable, Update) {
+  kvstore::config::LoadFromFile("../config.json");
   Memtable<>memtable(4);
   memtable.Add("key1", "value1");
    
@@ -40,6 +42,7 @@ TEST(Memtable, Update) {
 }
 
 TEST(Memtable, Delete) {
+  kvstore::config::LoadFromFile("../config.json");
   Memtable<>memtable(4);
 
   memtable.Add("key1", "value1");
@@ -55,6 +58,7 @@ TEST(Memtable, Delete) {
 }
 
 TEST(MemtableIterator, Iterator_ShouldGetAllTheValues){
+  kvstore::config::LoadFromFile("../config.json");
   Memtable<>memtable(4);
 
   memtable.Add("key2", "value2");

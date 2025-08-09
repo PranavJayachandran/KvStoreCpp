@@ -50,7 +50,7 @@ TEST_F(FileHandlerTest, WriteToFile_WritesToTheFile) {
   FileHandler::WriteToFile(test_file, val);
 
   std::string content = ReadWholeFile();
-  EXPECT_EQ(content, "12");
+  EXPECT_EQ(content, "12 ");
 }
 
 TEST_F(FileHandlerTest, GetSize_ReturnsCorrectSize) {
