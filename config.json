@@ -6,6 +6,6 @@
   "sstNumberOfFilesPerLevel": [2, 2, 100],
   "sstSizeOfFilePerLevel": [100, 200, 300],
   "sstLevelCount": 2,
-  "walDir" : "/home/pranj/code/cpp/kvstore/wal"
+  "walDir" : "wal"
 }
 
