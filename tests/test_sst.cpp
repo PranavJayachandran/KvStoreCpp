@@ -63,3 +63,48 @@ std::string Pad(const std::string &input, int size) {
 //
 //   std::remove(file_name.c_str());
 // }
+
+TEST_F(SSTTest, FlushCreatesMetadataForLevel0) {
+  kvstore::engine::Memtable<> memtable(4);
+  memtable.Add("a", "1");
+  memtable.Add("b", "2");
+
+  sst->Flush(memtable.GetMemtableITerator());
+
+  // You need a getter for testing
+  auto metas = sst->GetMetadataForLevel(0);
+
+  ASSERT_EQ(metas.size(), 1);
+  EXPECT_EQ(metas[0].min_key, "a");
+  EXPECT_EQ(metas[0].max_key, "b");
+  EXPECT_GT(metas[0].file_size, 0);
+}
+
+TEST_F(SSTTest, MetadataTracksCorrectKeyRange) {
+  kvstore::engine::Memtable<> memtable(4);
+  memtable.Add("key1", "v1");
+  memtable.Add("key3", "v3");
+  memtable.Add("key2", "v2");
+
+  sst->Flush(memtable.GetMemtableITerator());
+
+  auto metas = sst->GetMetadataForLevel(0);
+  ASSERT_EQ(metas.size(), 1);
+
+  EXPECT_EQ(metas[0].min_key, "key1");
+  EXPECT_EQ(metas[0].max_key, "key3");
+}
+
+TEST_F(SSTTest, MetadataRemovedAfterCompaction) {
+  kvstore::engine::Memtable<> mem1(4);
+  mem1.Add("a", "1");
+  sst->Flush(mem1.GetMemtableITerator());
+
+  kvstore::engine::Memtable<> mem2(4);
+  mem2.Add("b", "2");
+  sst->Flush(mem2.GetMemtableITerator());
+
+  // triggers compaction
+  auto level0 = sst->GetMetadataForLevel(0);
+  EXPECT_LE(level0.size(), 1);
+}
