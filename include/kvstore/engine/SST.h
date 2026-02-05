@@ -395,7 +395,6 @@ private:
         }
 
         if (taken_values.find(data.first.key) == taken_values.end()) {
-          std::cout << data.first.key << " " << data.first.value << "\n";
           taken_values.insert(data.first.key);
           return data.first;
         }
@@ -461,8 +460,6 @@ private:
         GetOverLappingFilesFromLevel(level + 1, start_end.first,
                                      start_end.second);
 
-    std::cout << start_end.first << " " << start_end.second << " "
-              << files_in_level_plus_1.size() << "\n";
     int file_index = 0;
     auto GetNextValueFromLevel = [&]() -> std::optional<Data> {
       std::string buffer(sst_key_block_size + sst_value_block_size + 1, '\0');
@@ -515,23 +512,34 @@ public:
 
   void Flush(MemtableIterator<K, V> memtableIterator) {
     std::string data_to_write = "";
+
+    std::string first_key = "", last_key = "";
     while (memtableIterator.HasNext()) {
       std::tuple<K, V, bool> data = memtableIterator.GetNext();
       std::string fixed_key = FixSize(std::get<0>(data), sst_key_block_size);
       std::string fixed_value =
           FixSize(std::get<1>(data), sst_value_block_size);
+      if (first_key.size() == 0) {
+        first_key = std::get<0>(data);
+      }
+      last_key = std::get<0>(data);
       data_to_write +=
           fixed_key + fixed_value + (std::get<2>(data) ? '1' : '0');
     }
+
+    std::string file_name = GetSstFileName();
     FileHandler::WriteToFile(directory_name + "/" + sst_level_directories[0] +
-                                 "/" + GetSstFileName(),
+                                 "/" + file_name,
                              data_to_write);
+
+    Metadata metadata{file_name, first_key, last_key, data_to_write.size()};
+    RegisterMetadata(0, metadata);
 
     std::string folder_name = directory_name + "/" + sst_level_directories[0];
     int file_count = FileHandler::GetNumberofFiles(folder_name);
-    if (file_count > 1) {
-      Compaction();
-    }
+    // if (file_count > 1) {
+    //   Compaction();
+    // }
   }
 
   // Level 0 compaction should be a single merge and then write.

@@ -71,7 +71,6 @@ private:
     while (wal->gcount() == buffer.size()) {
       std::string key = GetKeyFromString(buffer),
                   value = GetValueFromString(buffer);
-      std::cout << key << " " << value << "\n";
       bool is_deleted = IsTombstoneEntry(buffer);
       if (is_deleted) {
         skiplist_.Delete(key);
@@ -84,7 +83,11 @@ private:
   }
 
 public:
-  explicit Memtable(size_t size) : skiplist_(4) {
+  explicit Memtable(size_t size, bool should_clean_wal = false) : skiplist_(4) {
+
+    if (should_clean_wal) {
+      CleanWal();
+    }
     std::filesystem::path wal_dir{"wal"};
 
     if (!std::filesystem::exists(wal_dir)) {
@@ -94,6 +97,13 @@ public:
       ReconstructUsingWal();
     }
     max_size_ = size;
+  }
+
+  void CleanWal() {
+    std::filesystem::path path{wal_dir + "/" + wal_file_name};
+    if (std::filesystem::exists(path)) {
+      std::filesystem::remove(path);
+    }
   }
 
   void Add(const K &key, const V &value) {
