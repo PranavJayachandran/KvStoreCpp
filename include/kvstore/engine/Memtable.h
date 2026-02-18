@@ -3,6 +3,7 @@
 #include "FileHandler.h"
 #include "SkipList.h"
 #include <filesystem>
+#include <mutex>
 #include <string>
 namespace kvstore::engine {
 
@@ -12,10 +13,11 @@ class MemtableIterator;
 template <typename K = std::string, typename V = std::string> class Memtable {
 private:
   size_t max_size_;
+  std::mutex mx;
   SkipList<K, V> skiplist_;
   size_t current_size_ = 0;
   const std::string wal_dir = config::GetConfig().wal_dir;
-  const std::string wal_file_name = "wal.txt";
+  const std::string wal_file_name;
   const int wal_key_block_size = config::GetConfig().sst_key_block_size;
   const int wal_value_block_size = config::GetConfig().sst_value_block_size;
 
@@ -64,6 +66,8 @@ private:
     return buffer[wal_key_block_size + wal_value_block_size] == '1';
   }
   void ReconstructUsingWal() {
+
+    std::lock_guard<std::mutex> lock(mx);
     std::unique_ptr<std::ifstream> wal =
         FileHandler::GetPointerToFile(wal_dir + "/" + wal_file_name).stream;
     std::string buffer(wal_key_block_size + wal_value_block_size + 1, '\0');
@@ -76,43 +80,33 @@ private:
         skiplist_.Delete(key);
       } else {
         skiplist_.Add(key, value);
-        current_size_ += sizeof(key) + sizeof(value);
+        current_size_ += key.size() + value.size();
       }
       wal->read(&buffer[0], buffer.size());
     }
   }
 
 public:
-  explicit Memtable(size_t size, bool should_clean_wal = false) : skiplist_(4) {
-
-    if (should_clean_wal) {
-      CleanWal();
-    }
-    std::filesystem::path wal_dir{"wal"};
+  explicit Memtable(size_t size, std::string wal_file_name,
+                    bool should_clean_wal = false)
+      : skiplist_(4), wal_file_name(wal_file_name) {
 
     if (!std::filesystem::exists(wal_dir)) {
       std::filesystem::create_directories(wal_dir);
     }
-    if (FileHandler::GetNumberofFiles(wal_dir) != 0) {
-      ReconstructUsingWal();
-    }
     max_size_ = size;
   }
 
-  void CleanWal() {
-    std::filesystem::path path{wal_dir + "/" + wal_file_name};
-    if (std::filesystem::exists(path)) {
-      std::filesystem::remove(path);
-    }
-  }
-
   void Add(const K &key, const V &value) {
-    skiplist_.Add(key, value);
-    current_size_ += sizeof(key) + sizeof(value);
+    std::lock_guard<std::mutex> lock(mx);
+    std::cout << value << "\n";
     WriteToWal(key, value, false);
+    skiplist_.Add(key, value);
+    current_size_ += key.size() + value.size();
   }
 
   bool Get(const K &key, V &out_value) {
+    std::lock_guard<std::mutex> lock(mx);
     const V *val = skiplist_.Get(key);
     if (val) {
       out_value = *val;
@@ -122,22 +116,16 @@ public:
   }
 
   void Delete(const K &key) {
-    skiplist_.Delete(key);
+    std::lock_guard<std::mutex> lock(mx);
     std::string value = "";
     WriteToWal(key, value, true);
+    skiplist_.Delete(key);
   }
 
-  bool ShouldFlush() { return current_size_ < max_size_; }
+  bool ShouldFlush() { return current_size_ >= max_size_; }
 
   MemtableIterator<K, V> GetMemtableITerator() {
     return MemtableIterator<K, V>(skiplist_.GetSkipListIterator());
-  }
-
-  void Flush() {
-    std::vector<std::string> wal_file = FileHandler::GetAllFileNames(wal_dir);
-    // wal_file should only have 1 wal or no wal.
-    std::string data = "";
-    FileHandler::WriteToFile(wal_dir + "/" + wal_file_name, data);
   }
 };
 

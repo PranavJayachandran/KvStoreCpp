@@ -14,7 +14,7 @@ void clean_wal() {
 TEST(MemtableTest, Insert) {
   clean_wal();
   kvstore::config::LoadFromFile("../config.json");
-  Memtable<std::string, std::string> memtable(10);
+  Memtable<std::string, std::string> memtable(10, "wal");
   memtable.Add("key1", "value1");
   memtable.Add("key2", "value2");
 
@@ -36,7 +36,7 @@ TEST(MemtableTest, Insert) {
 TEST(Memtable, Update) {
   clean_wal();
   kvstore::config::LoadFromFile("../config.json");
-  Memtable<> memtable(4);
+  Memtable<> memtable(4, "wal");
   memtable.Add("key1", "value1");
 
   std::string val;
@@ -53,7 +53,7 @@ TEST(Memtable, Update) {
 TEST(Memtable, Delete) {
   clean_wal();
   kvstore::config::LoadFromFile("../config.json");
-  Memtable<> memtable(4);
+  Memtable<> memtable(4, "wal");
 
   memtable.Add("key1", "value1");
 
@@ -70,7 +70,7 @@ TEST(Memtable, Delete) {
 TEST(MemtableIterator, Iterator_ShouldGetAllTheValues) {
   clean_wal();
   kvstore::config::LoadFromFile("../config.json");
-  Memtable<> memtable(4);
+  Memtable<> memtable(4, "wal");
 
   memtable.Add("key2", "value2");
   memtable.Add("key1", "value1");
