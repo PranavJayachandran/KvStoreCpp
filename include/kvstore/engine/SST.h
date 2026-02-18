@@ -141,6 +141,13 @@ private:
     return value;
   }
 
+  void delete_sst(int level, const std::string &file_path) {
+    FileHandler::DeleteFile(file_path);
+    std::string file_name =
+        std::filesystem::path(file_path).filename().string();
+    UnRegisterMetadata(level, file_name);
+  }
+
   bool IsTombstoneEntry(const std::string &buffer) {
     return buffer[sst_key_block_size + sst_value_block_size] == '1';
   }
@@ -257,7 +264,6 @@ private:
       }
 
       if (selected_level.has_value()) {
-
         std::string temp = PadData(selected_level.value());
         if (data_to_write.size() + temp.size() >=
             sst_size_of_file_per_level[level + 1]) {
@@ -270,6 +276,7 @@ private:
           Metadata metadata{sst_level1_new_file_name, first_key_written,
                             last_key_written, data_to_write.size()};
           RegisterMetadata(level + 1, metadata);
+          UnRegisterMetadata(level, file_name);
           data_to_write = "";
 
           first_key_written = "";
@@ -284,7 +291,6 @@ private:
     }
 
     while (level0_opt) {
-
       Data level0_value = *level0_opt;
       if (!(level + 1 == sst_number_of_levels - 1 && level0_value.is_deleted)) {
         std::string temp = FixSize(level0_value.key, sst_key_block_size) +
@@ -300,6 +306,7 @@ private:
           Metadata metadata{file_name, first_key_written, last_key_written,
                             data_to_write.size()};
           RegisterMetadata(level + 1, metadata);
+          UnRegisterMetadata(level, file_name);
           data_to_write = "";
           first_key_written = "";
           last_key_written = "";
@@ -329,6 +336,7 @@ private:
           Metadata metadata{sst_level1_new_file_name, first_key_written,
                             last_key_written, data_to_write.size()};
           RegisterMetadata(level + 1, metadata);
+          UnRegisterMetadata(level, level1_value.file_name);
           data_to_write = "";
           first_key_written = "";
           last_key_written = "";
@@ -424,10 +432,10 @@ private:
     MergeAndWriteForLevelAndLevelPlus1(0, GetNextValueFromLevel0,
                                        GetNextValueFromLevel1);
     for (int i = 0; i < files_in_level0.size(); i++) {
-      FileHandler::DeleteFile(files_in_level0[i].file_name);
+      delete_sst(0, files_in_level0[i].file_name);
     }
     for (int i = 0; i < files_in_level1.size(); i++) {
-      FileHandler::DeleteFile(files_in_level1[i].file_name);
+      delete_sst(1, files_in_level1[i].file_name);
     }
 
     std::string folder_name = directory_name + "/" + sst_level_directories[1];
@@ -489,10 +497,9 @@ private:
     };
     MergeAndWriteForLevelAndLevelPlus1(level, GetNextValueFromLevel,
                                        GetNextValueFromLevelPlus1);
-
-    FileHandler::DeleteFile(files[0].file_name);
+    delete_sst(level, files[0].file_name);
     for (int i = 0; i < files_in_level_plus_1.size(); i++) {
-      FileHandler::DeleteFile(files_in_level_plus_1[i].file_name);
+      delete_sst(level + 1, files_in_level_plus_1[i].file_name);
     }
 
     std::string folder_name =
@@ -506,11 +513,20 @@ private:
   void RegisterMetadata(int level, const Metadata &metadata) {
     sst_metadata[level].push_back(metadata);
   }
+  void UnRegisterMetadata(int level, const std::string key) {
+    auto it =
+        std::lower_bound(sst_metadata[level].begin(), sst_metadata[level].end(),
+                         key, [](const Metadata &a, const std::string &b) {
+                           return a.file_name < b;
+                         });
+    if (it != sst_metadata[level].end() && it->file_name == key) {
+      sst_metadata[level].erase(it);
+    }
+  }
 
 public:
   explicit SST() { sst_metadata.resize(sst_number_of_levels); }
-
-  void Flush(MemtableIterator<K, V> memtableIterator) {
+  std::string Flush(MemtableIterator<K, V> memtableIterator) {
     std::string data_to_write = "";
 
     std::string first_key = "", last_key = "";
@@ -528,18 +544,19 @@ public:
     }
 
     std::string file_name = GetSstFileName();
-    FileHandler::WriteToFile(directory_name + "/" + sst_level_directories[0] +
-                                 "/" + file_name,
-                             data_to_write);
+    std::string file_path =
+        directory_name + "/" + sst_level_directories[0] + "/" + file_name;
+    FileHandler::WriteToFile(file_path, data_to_write);
 
     Metadata metadata{file_name, first_key, last_key, data_to_write.size()};
     RegisterMetadata(0, metadata);
 
     std::string folder_name = directory_name + "/" + sst_level_directories[0];
     int file_count = FileHandler::GetNumberofFiles(folder_name);
-    // if (file_count > 1) {
-    //   Compaction();
-    // }
+    if (file_count > 1) {
+      Compaction();
+    }
+    return file_path;
   }
 
   // Level 0 compaction should be a single merge and then write.
