@@ -8,13 +8,14 @@ template <typename K = std::string, typename V = std::string> class Engine {
 
   std::unique_ptr<SST<K, V>> sst;
   std::unique_ptr<MemtableManager<K, V>> memtable_manager;
+  const int memtable_size = 100;
 
 public:
   Engine() {
     sst = std::make_unique<SST<K, V>>();
 
     memtable_manager = std::make_unique<MemtableManager<K, V>>(
-        10, [this](MemtableIterator<K, V> iterator) {
+        memtable_size, [this](MemtableIterator<K, V> iterator) {
           sst->Flush(iterator);
           return true;
         });

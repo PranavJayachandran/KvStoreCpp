@@ -18,7 +18,6 @@ void check_for_multithread() {
 
   std::string value;
   memtable->Get("key", value);
-  std::cout << "VAlue" << value;
 }
 int main() {
   std::cout << "Staring";

@@ -89,11 +89,14 @@ private:
   void ReconstructMemtableFromWal() {
     std::lock_guard<std::mutex> lock(swap_mutex);
     std::vector<std::filesystem::path> wal_files;
+    std::cout << std::filesystem::exists(wal_dir);
     for (const auto &entry : std::filesystem::directory_iterator(wal_dir)) {
       if (std::filesystem::is_regular_file(entry.path())) {
         wal_files.push_back(entry.path());
       }
     }
+
+    std::cout << wal_files.size();
 
     std::sort(wal_files.begin(), wal_files.end());
 
@@ -112,6 +115,11 @@ private:
       // Last WAL file becomes active
       if (path == wal_files.back()) {
         active_memtable_ = std::move(memtable);
+        auto p = active_memtable_->GetMemtableITerator();
+        while (p.HasNext()) {
+          std::tuple<K, V, bool> data = p.GetNext();
+          std::cout << std::get<0>(data) << " " << std::get<1>(data) << " ";
+        }
       } else {
         immutable_memtables.push_back(std::move(memtable));
       }

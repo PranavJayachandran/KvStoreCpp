@@ -99,7 +99,6 @@ public:
 
   void Add(const K &key, const V &value) {
     std::lock_guard<std::mutex> lock(mx);
-    std::cout << value << "\n";
     WriteToWal(key, value, false);
     skiplist_.Add(key, value);
     current_size_ += key.size() + value.size();

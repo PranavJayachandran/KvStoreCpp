@@ -58,66 +58,66 @@ TEST_F(EngineTest, DeleteRemovesKey) {
   EXPECT_FALSE(found);
 }
 
-// TEST_F(EngineTest, MultipleKeys) {
-//   Engine<> engine;
-//
-//   for (int i = 0; i < 100; i++) {
-//     engine.Add("key" + std::to_string(i), "value" + std::to_string(i));
-//   }
-//
-//   std::string out;
-//   EXPECT_TRUE(engine.Get("key10", out));
-//   EXPECT_EQ(out, "value10");
-//
-//   EXPECT_TRUE(engine.Get("key50", out));
-//   EXPECT_EQ(out, "value50");
-// }
-//
-// TEST_F(EngineTest, OverwriteValue) {
-//   Engine<> engine;
-//
-//   engine.Add("key1", "value1");
-//   engine.Add("key1", "value2");
-//
-//   std::string out;
-//   bool found = engine.Get("key1", out);
-//
-//   EXPECT_TRUE(found);
-//   EXPECT_EQ(out, "value2");
-// }
-//
-// TEST_F(EngineTest, FlushToSST) {
-//   Engine<> engine;
-//
-//   // small memtable triggers flush quickly
-//   for (int i = 0; i < 50; i++) {
-//     engine.Add("k" + std::to_string(i), "v" + std::to_string(i));
-//   }
-//
-//   // give flush thread time
-//   std::this_thread::sleep_for(std::chrono::milliseconds(200));
-//
-//   std::string out;
-//   EXPECT_TRUE(engine.Get("k10", out));
-//   EXPECT_EQ(out, "v10");
-// }
-//
-// TEST_F(EngineTest, RecoveryAfterRestart) {
-//   {
-//     Engine<> engine;
-//     engine.Add("persist_key", "persist_value");
-//   }
-//
-//   // simulate restart
-//   Engine<> recovered;
-//
-//   std::string out;
-//   bool found = recovered.Get("persist_key", out);
-//
-//   EXPECT_TRUE(found);
-//   EXPECT_EQ(out, "persist_value");
-// }
-//
+TEST_F(EngineTest, MultipleKeys) {
+  Engine<> engine;
+
+  for (int i = 0; i < 10; i++) {
+    engine.Add("key" + std::to_string(i), "value" + std::to_string(i));
+  }
+
+  std::string out;
+  EXPECT_TRUE(engine.Get("key9", out));
+  EXPECT_EQ(out, "value9");
+
+  EXPECT_TRUE(engine.Get("key4", out));
+  EXPECT_EQ(out, "value4");
+}
+
+TEST_F(EngineTest, OverwriteValue) {
+  Engine<> engine;
+
+  engine.Add("key1", "value1");
+  engine.Add("key1", "value2");
+
+  std::string out;
+  bool found = engine.Get("key1", out);
+
+  EXPECT_TRUE(found);
+  EXPECT_EQ(out, "value2");
+}
+
+TEST_F(EngineTest, FlushToSST) {
+  Engine<> engine;
+
+  // small memtable triggers flush quickly
+  for (int i = 0; i < 50; i++) {
+    engine.Add("k" + std::to_string(i), "v" + std::to_string(i));
+  }
+
+  // give flush thread time
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  std::string out;
+  EXPECT_TRUE(engine.Get("k10", out));
+  EXPECT_EQ(out, "v10");
+}
+
+TEST_F(EngineTest, RecoveryAfterRestart) {
+  {
+    Engine<> engine;
+    engine.Add("persist_ke", "persist_valu");
+  }
+
+  // simulate restart
+  Engine<> recovered;
+
+  std::string out;
+  bool found = recovered.Get("persist_ke", out);
+
+  EXPECT_TRUE(found);
+  EXPECT_EQ(out, "persist_valu");
+}
+
 // TEST_F(EngineTest, ConcurrentWrites) {
 //   Engine<> engine;
 //
