@@ -66,7 +66,7 @@ std::string Pad(const std::string &input, int size) {
 }
 
 TEST_F(SSTTest, Flush_ShouldWriteToFile) {
-  kvstore::engine::Memtable<> memtable(4);
+  kvstore::engine::Memtable<> memtable(4, "wal");
   memtable.Add("key2", "value2");
   memtable.Add("key1", "value1");
   memtable.Add("key4", "value4");
@@ -90,7 +90,7 @@ TEST_F(SSTTest, Flush_ShouldWriteToFile) {
 }
 
 TEST_F(SSTTest, FlushCreatesMetadataForLevel0) {
-  kvstore::engine::Memtable<> memtable(4, true);
+  kvstore::engine::Memtable<> memtable(4, "wal");
   memtable.Add("a", "1");
   memtable.Add("b", "2");
 
@@ -105,7 +105,7 @@ TEST_F(SSTTest, FlushCreatesMetadataForLevel0) {
 }
 
 TEST_F(SSTTest, MetadataTracksCorrectKeyRange) {
-  kvstore::engine::Memtable<> memtable(4, true);
+  kvstore::engine::Memtable<> memtable(4, "wal");
   memtable.Add("key1", "v1");
   memtable.Add("key3", "v3");
   memtable.Add("key2", "v2");
@@ -120,11 +120,11 @@ TEST_F(SSTTest, MetadataTracksCorrectKeyRange) {
 }
 
 TEST_F(SSTTest, MetadataRemovedAfterCompaction) {
-  kvstore::engine::Memtable<> mem1(4);
+  kvstore::engine::Memtable<> mem1(4, "wal");
   mem1.Add("a", "1");
   sst->Flush(mem1.GetMemtableITerator());
 
-  kvstore::engine::Memtable<> mem2(4);
+  kvstore::engine::Memtable<> mem2(4, "wal");
   mem2.Add("b", "2");
   sst->Flush(mem2.GetMemtableITerator());
 
