@@ -122,6 +122,16 @@ public:
     skiplist_.Delete(key);
   }
 
+  // To be used by the manager while ReconstructUsingWal
+  void InsertRecovered(const K &key, const V &value, bool is_deleted) {
+    if (is_deleted)
+      skiplist_.Delete(key);
+    else
+      skiplist_.Add(key, value);
+
+    current_size_++;
+  }
+
   bool ShouldFlush() { return current_size_ >= max_size_; }
 
   MemtableIterator<K, V> GetMemtableITerator() {
