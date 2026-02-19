@@ -137,6 +137,7 @@ public:
   MemtableIterator<K, V> GetMemtableITerator() {
     return MemtableIterator<K, V>(skiplist_.GetSkipListIterator());
   }
+  const std::string GetWalFileName() { return wal_file_name; }
 };
 
 template <typename K, typename V> class MemtableIterator {
