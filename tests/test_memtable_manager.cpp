@@ -22,7 +22,7 @@ protected:
   void TearDown() override { std::filesystem::remove_all(test_wal_dir); }
 };
 
-bool CallBack(std::shared_ptr<MemtableIterator<>>) { return false; }
+bool CallBack(MemtableIterator<>) { return false; }
 TEST_F(MemtableManagerTest, BasicInsertAndGet) {
   MemtableManager<> manager(1024, CallBack);
 
