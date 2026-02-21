@@ -22,7 +22,7 @@ private:
   std::thread flush_thread;
   std::condition_variable flush_cv;
   bool stop_flush = false;
-  std::function<bool(std::shared_ptr<MemtableIterator<>>)> flush_call_back;
+  std::function<bool(MemtableIterator<K, V>)> flush_call_back;
   int memtable_size;
   const std::string wal_dir = config::GetConfig().wal_dir;
   const int wal_key_block_size = config::GetConfig().sst_key_block_size;
@@ -89,11 +89,14 @@ private:
   void ReconstructMemtableFromWal() {
     std::lock_guard<std::mutex> lock(swap_mutex);
     std::vector<std::filesystem::path> wal_files;
+    std::cout << std::filesystem::exists(wal_dir);
     for (const auto &entry : std::filesystem::directory_iterator(wal_dir)) {
       if (std::filesystem::is_regular_file(entry.path())) {
         wal_files.push_back(entry.path());
       }
     }
+
+    std::cout << wal_files.size();
 
     std::sort(wal_files.begin(), wal_files.end());
 
@@ -112,6 +115,11 @@ private:
       // Last WAL file becomes active
       if (path == wal_files.back()) {
         active_memtable_ = std::move(memtable);
+        auto p = active_memtable_->GetMemtableITerator();
+        while (p.HasNext()) {
+          std::tuple<K, V, bool> data = p.GetNext();
+          std::cout << std::get<0>(data) << " " << std::get<1>(data) << " ";
+        }
       } else {
         immutable_memtables.push_back(std::move(memtable));
       }
@@ -144,8 +152,7 @@ private:
       backpressure_cv.notify_all(); // <- REQUIRED
       if (memtable_to_flush == nullptr)
         continue;
-      if (flush_call_back(std::make_shared<MemtableIterator<>>(
-              memtable_to_flush->GetMemtableITerator())))
+      if (flush_call_back(memtable_to_flush->GetMemtableITerator()))
         DeleteWal(memtable_to_flush.get()->GetWalFileName());
     }
   }
@@ -159,9 +166,8 @@ private:
   }
 
 public:
-  MemtableManager(
-      size_t size,
-      std::function<bool(std::shared_ptr<MemtableIterator<>>)> callback)
+  MemtableManager(size_t size,
+                  std::function<bool(MemtableIterator<K, V>)> callback)
       : memtable_size(size), flush_call_back(callback) {
     ReconstructMemtableFromWal();
 

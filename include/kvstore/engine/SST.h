@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <ctime>
+#include <filesystem>
 #include <functional>
 #include <iterator>
 #include <optional>
@@ -40,6 +41,7 @@ private:
   };
 
   const std::string directory_name = config::GetConfig().sst_dir;
+  std::mutex compaction_mx;
   const int sst_key_block_size = config::GetConfig().sst_key_block_size;
   const int sst_value_block_size = config::GetConfig().sst_value_block_size;
   const std::vector<int> sst_number_of_files_per_level =
@@ -49,58 +51,67 @@ private:
   const int sst_number_of_levels = config::GetConfig().sst_level_count;
   const std::vector<std::string> sst_level_directories =
       config::GetConfig().sst_level_folders;
-  const std::string sst = "sst.txt";
 
   std::vector<std::vector<Metadata>> sst_metadata;
 
-  bool Search(const K &key, int &out_index) {
-    int start = 0, file_size = FileHandler::GetSize(sst);
-    // the size of each entry would be size of key + size of value + 1 ( 1 for
-    // tombstone)
-    int number_of_entries =
-        file_size / (sst_value_block_size + sst_key_block_size + 1);
-    int end = number_of_entries - 1;
-    while (start <= end) {
-      int mid = start + (end - start) / 2;
-      std::string value =
-          FileHandler::ReadFromFile(sst, mid, sst_key_block_size);
-      if (value == key) {
-        out_index = mid;
-        return true;
+  bool Search(const K &item, std::string &out_value) {
+    std::lock_guard<std::mutex> lock(compaction_mx);
+    for (int i = 0; i < sst_metadata.size(); i++) {
+      int low = 0, high = sst_metadata[i].size() - 1;
+      int entry_index = -1;
+      while (low <= high) {
+        int mid = (low + high) / 2;
+        if (sst_metadata[i][mid].min_key > item) {
+          high = mid - 1;
+        } else if (sst_metadata[i][mid].max_key < item) {
+          low = mid + 1;
+        } else {
+          entry_index = mid;
+          break;
+        }
       }
-      if (value < key) {
-        start = mid + 1;
-      } else {
-        end = mid - 1;
+
+      if (entry_index == -1)
+        continue;
+
+      const Metadata entry = sst_metadata[i][entry_index];
+
+      int start = 0, file_size = entry.file_size;
+      // the size of each entry would be size of key + size of
+      // value + 1 ( 1 for tombstone)
+      int number_of_entries =
+          file_size / (sst_value_block_size + sst_key_block_size + 1);
+      int end = number_of_entries - 1;
+      while (start <= end) {
+        int mid = start + (end - start) / 2;
+        std::string data = FileHandler::ReadFromFile(
+            entry.file_name,
+            mid * (sst_key_block_size + sst_value_block_size + 1),
+            sst_key_block_size + sst_value_block_size + 1);
+        std::string key = data.substr(0, sst_key_block_size);
+        std::string value =
+            data.substr(sst_key_block_size, sst_value_block_size);
+        if (key == item) {
+          if (data.back() == '1')
+            return false;
+          out_value = value;
+          return true;
+        }
+        if (key < item) {
+          start = mid + 1;
+        } else {
+          end = mid - 1;
+        }
       }
     }
     return false;
   }
 
-  int GetInsertPosition(const K &key) {
-    int start = 0, file_size = FileHandler::GetSize(sst);
-    // the size of each entry would be size of key + size of value + 1 ( 1 for
-    // tombstone)
-    int number_of_entries =
-        file_size / (sst_value_block_size + sst_key_block_size + 1);
-    int end = number_of_entries - 1;
-    while (start <= end) {
-      int mid = start + (end - start) / 2;
-      std::string value = FileHandler::ReadFromFile(
-          sst, mid * (sst_value_block_size + sst_key_block_size + 1),
-          sst_key_block_size);
-      if (value < key) {
-        start = mid + 1;
-      } else {
-        end = mid - 1;
-      }
-    }
-    return start;
-  }
-
   std::string FixSize(const K &key, int size) {
     std::string value;
     if (key.size() > size) {
+      std::cout << "key was larger than expected size of " << size
+                << ". Truncating it" << "\n";
       value = key.substr(0, size);
     } else {
       value = key + std::string(size - key.size(), '\0');
@@ -142,10 +153,10 @@ private:
   }
 
   void delete_sst(int level, const std::string &file_path) {
-    FileHandler::DeleteFile(file_path);
     std::string file_name =
         std::filesystem::path(file_path).filename().string();
     UnRegisterMetadata(level, file_name);
+    FileHandler::DeleteFile(file_path);
   }
 
   bool IsTombstoneEntry(const std::string &buffer) {
@@ -227,7 +238,6 @@ private:
     std::string temp = FixSize(level_value.key, sst_key_block_size) +
                        FixSize(level_value.value, sst_value_block_size) +
                        (level_value.is_deleted ? "1" : "0");
-
     return temp;
   }
 
@@ -272,11 +282,9 @@ private:
                                   sst_level_directories[level + 1] + "/" +
                                   sst_level1_new_file_name;
           FileHandler::WriteToFile(file_name, data_to_write);
-
           Metadata metadata{sst_level1_new_file_name, first_key_written,
                             last_key_written, data_to_write.size()};
           RegisterMetadata(level + 1, metadata);
-          UnRegisterMetadata(level, file_name);
           data_to_write = "";
 
           first_key_written = "";
@@ -302,11 +310,10 @@ private:
           std::string file_name = directory_name + "/" +
                                   sst_level_directories[level + 1] + "/" +
                                   sst_level0_new_file_name;
-          FileHandler::WriteToFile(sst_level0_new_file_name, data_to_write);
+          FileHandler::WriteToFile(file_name, data_to_write);
           Metadata metadata{file_name, first_key_written, last_key_written,
                             data_to_write.size()};
           RegisterMetadata(level + 1, metadata);
-          UnRegisterMetadata(level, file_name);
           data_to_write = "";
           first_key_written = "";
           last_key_written = "";
@@ -336,7 +343,6 @@ private:
           Metadata metadata{sst_level1_new_file_name, first_key_written,
                             last_key_written, data_to_write.size()};
           RegisterMetadata(level + 1, metadata);
-          UnRegisterMetadata(level, level1_value.file_name);
           data_to_write = "";
           first_key_written = "";
           last_key_written = "";
@@ -511,7 +517,12 @@ private:
   }
 
   void RegisterMetadata(int level, const Metadata &metadata) {
-    sst_metadata[level].push_back(metadata);
+    auto &vec = sst_metadata[level];
+    vec.insert(std::upper_bound(vec.begin(), vec.end(), metadata,
+                                [](const Metadata &a, const Metadata &b) {
+                                  return a.min_key < b.min_key;
+                                }),
+               metadata);
   }
   void UnRegisterMetadata(int level, const std::string key) {
     auto it =
@@ -525,8 +536,15 @@ private:
   }
 
 public:
-  explicit SST() { sst_metadata.resize(sst_number_of_levels); }
+  explicit SST() {
+    sst_metadata.resize(sst_number_of_levels + 1);
+    for (int i = 0; i <= sst_number_of_levels; i++) {
+      std::filesystem::create_directories(directory_name + "/level" +
+                                          std::to_string(i));
+    }
+  }
   std::string Flush(MemtableIterator<K, V> memtableIterator) {
+    std::lock_guard<std::mutex> lock(compaction_mx);
     std::string data_to_write = "";
 
     std::string first_key = "", last_key = "";
@@ -564,22 +582,12 @@ public:
 
   bool Get(const K &key, V &out_value) {
     std::string fixed_key = FixSize(key, sst_key_block_size);
-    int index = -1;
-    bool isPresent = Search(fixed_key, index);
+    std::string data;
+    bool isPresent = Search(fixed_key, out_value);
     if (!isPresent) {
       out_value = "";
       return false;
     }
-    std::string data = FileHandler::ReadFromFile(
-        sst,
-        index * (sst_key_block_size + sst_value_block_size + 1) +
-            sst_key_block_size,
-        sst_value_block_size + 1);
-    if (data.size() == 0 || data.back() == '1') {
-      out_value = "";
-      return false;
-    }
-    out_value = data.substr(0, data.size() - 1);
     out_value.erase(out_value.find_last_not_of('\0') + 1);
     return true;
   }
