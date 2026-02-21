@@ -56,7 +56,43 @@ private:
 
   bool Search(const K &item, std::string &out_value) {
     std::lock_guard<std::mutex> lock(compaction_mx);
-    for (int i = 0; i < sst_metadata.size(); i++) {
+    // For level 0, because there are overlapping files, the entry in the older
+    // file should be considered.
+    for (int i = sst_metadata[0].size() - 1; i >= 0; i--) {
+      if (sst_metadata[0][i].min_key <= item &&
+          sst_metadata[0][i].max_key >= item) {
+        const Metadata entry = sst_metadata[0][i];
+
+        int start = 0, file_size = entry.file_size;
+        // the size of each entry would be size of key + size of
+        // value + 1 ( 1 for tombstone)
+        int number_of_entries =
+            file_size / (sst_value_block_size + sst_key_block_size + 1);
+        int end = number_of_entries - 1;
+        while (start <= end) {
+          int mid = start + (end - start) / 2;
+          std::string data = FileHandler::ReadFromFile(
+              entry.file_name,
+              mid * (sst_key_block_size + sst_value_block_size + 1),
+              sst_key_block_size + sst_value_block_size + 1);
+          std::string key = data.substr(0, sst_key_block_size);
+          std::string value =
+              data.substr(sst_key_block_size, sst_value_block_size);
+          if (key == item) {
+            if (data.back() == '1')
+              return false;
+            out_value = value;
+            return true;
+          }
+          if (key < item) {
+            start = mid + 1;
+          } else {
+            end = mid - 1;
+          }
+        }
+      }
+    }
+    for (int i = 1; i < sst_metadata.size(); i++) {
       int low = 0, high = sst_metadata[i].size() - 1;
       int entry_index = -1;
       while (low <= high) {
@@ -427,8 +463,8 @@ private:
         files_in_level1[file_index].stream->read(&buffer[0], buffer.size());
         if (files_in_level1[file_index].stream->gcount() ==
             sst_key_block_size + sst_value_block_size + 1) {
-          const std::string file_name = "";
-          return GetDataFromString(buffer, file_name);
+          return GetDataFromString(buffer,
+                                   files_in_level1[file_index].file_name);
         } else {
           file_index++;
         }
@@ -480,8 +516,7 @@ private:
       files[0].stream->read(&buffer[0], buffer.size());
       if (files[0].stream->gcount() ==
           sst_key_block_size + sst_value_block_size + 1) {
-        const std::string file_name = "";
-        return GetDataFromString(buffer, file_name);
+        return GetDataFromString(buffer, files[0].file_name);
       }
       return std::nullopt;
     };
@@ -493,8 +528,8 @@ private:
                                                        buffer.size());
         if (files_in_level_plus_1[file_index].stream->gcount() ==
             sst_key_block_size + sst_value_block_size + 1) {
-          const std::string file_name = "";
-          return GetDataFromString(buffer, file_name);
+          return GetDataFromString(buffer,
+                                   files_in_level_plus_1[file_index].file_name);
         } else {
           file_index++;
         }
@@ -525,14 +560,12 @@ private:
                metadata);
   }
   void UnRegisterMetadata(int level, const std::string key) {
-    auto it =
-        std::lower_bound(sst_metadata[level].begin(), sst_metadata[level].end(),
-                         key, [](const Metadata &a, const std::string &b) {
-                           return a.file_name < b;
-                         });
-    if (it != sst_metadata[level].end() && it->file_name == key) {
-      sst_metadata[level].erase(it);
-    }
+    auto &vec = sst_metadata[level];
+    auto it = std::find_if(vec.begin(), vec.end(), [&](const Metadata &m) {
+      return m.file_name == key;
+    });
+    if (it != vec.end())
+      vec.erase(it);
   }
 
 public:
