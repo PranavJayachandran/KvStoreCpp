@@ -169,6 +169,8 @@ public:
   MemtableManager(size_t size,
                   std::function<bool(MemtableIterator<K, V>)> callback)
       : memtable_size(size), flush_call_back(callback) {
+
+    std::filesystem::create_directories(config::GetConfig().wal_dir);
     ReconstructMemtableFromWal();
 
     if (!active_memtable_) {

@@ -12,6 +12,7 @@ template <typename K = std::string, typename V = std::string> class Engine {
 
 public:
   Engine() {
+    kvstore::config::LoadFromFile("../config.json");
     sst = std::make_unique<SST<K, V>>();
 
     memtable_manager = std::make_unique<MemtableManager<K, V>>(
