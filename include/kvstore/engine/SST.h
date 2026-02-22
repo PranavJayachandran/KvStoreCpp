@@ -571,9 +571,10 @@ private:
 public:
   explicit SST() {
     sst_metadata.resize(sst_number_of_levels + 1);
+    std::cout << directory_name << "\n";
     for (int i = 0; i <= sst_number_of_levels; i++) {
-      std::filesystem::create_directories(directory_name + "/level" +
-                                          std::to_string(i));
+      std::filesystem::create_directories(directory_name + "/" +
+                                          sst_level_directories[i]);
     }
   }
   std::string Flush(MemtableIterator<K, V> memtableIterator) {
