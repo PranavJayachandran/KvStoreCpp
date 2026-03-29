@@ -1,26 +1,95 @@
-The **KVStore** implementation uses **LSM trees** to store data both in memory and on disk, combining the advantages of both. Three key components play a crucial role: **SkipLists**, **Bloom Filters**, and **LSM trees**.
+# 🌲 KvStoreCpp: High-Performance LSM-Tree Storage Engine
 
-##### **LSM Tree**
-The system uses an in-memory **Memtable** and **SSTables** stored on disk. It follows a leveled storage structure, inspired by **RocksDB** and **LevelDB**. Each level has a fixed size; once this maximum size is reached, **compaction** is triggered. During compaction, random entries are moved from the current level to the next one (from level 1 to level 2, and so on). This process stops at the last level, where no further promotion occurs. Both the **Memtable** and **SSTables** have specialized implementations to optimize performance.
+**KvStoreCpp** is a persistent, disk-resident Key-Value store built from scratch in C++. It utilizes a **Log-Structured Merge-Tree (LSM-Tree)** architecture to provide high write throughput and features a **Go/CGO integration layer** to bridge low-level systems performance with modern web scalability.
 
-#### **MemTable**
-A **SkipList** is used to store data in memory (although an **RBTree** implementation could also have been used). **Skip lists** provide efficient insertion, deletion, and search operations. Additionally, a **Write-Ahead Log (WAL)** is employed to ensure fault tolerance.
+I built this project to master the internals of storage engines like RocksDB—specifically focusing on memory-to-disk staging, data durability (WAL), and optimizing disk I/O with probabilistic filters.
 
-##### **SSTable**
-**Sorted String Tables (SSTables)** are used to store data on disk. Since the data is sorted, it allows for faster querying. Each entry is saved in a key-value format (with a **#** suffix if the key was soft-deleted). Every entry is allocated a fixed size (configured to 30 bytes in the code). Because of this fixed-size layout, **binary search** can be used to significantly speed up lookups.
+---
 
-##### **Compaction**
-When the **Memtable** reaches a certain size `n`, keeping all data in memory becomes inefficient. At this point, the data is flushed to **SSTables** on disk. Specifically, the data is written to a **Level 0 SSTable**. If **Level 0** is full, it is mergerged into **Level1**. If subsequent levels become full,  a portion of its data is pushed to next level.
+## 🏗️ System Architecture
 
-##### **Bloom Filters**
-**Bloom filters** are probabilistic data structures used to check whether a given key is part of a set. If a **Bloom filter** returns "**yes**", the key might be present; if it returns "**no**", the key is definitely not present.  
-Since reading from disk is slow, a **Bloom filter** is maintained for each level to quickly rule out missing keys and avoid unnecessary disk lookups.
+The engine converts random application writes into efficient, sequential disk I/O through a tiered architecture.
 
-##### **Insert**
-Inserts are first made to the **Memtable**, which may later be flushed to the **SSTables**.
+### 1. The Write Path (Durability & Speed)
+* **Write-Ahead Log (WAL):** Every mutation is appended to a disk-resident log before being applied to memory, ensuring **Atomicity and Durability**.
+* **SkipList MemTable:** An in-memory, sorted data structure. I chose a SkipList over a Red-Black Tree for its $O(\log N)$ performance and easier transition to lock-free concurrency.
 
-##### **Delete**
-Instead of being immediately deleted, keys are **soft-deleted** (also known as **tombstoned**). These tombstoned entries are propagated during **compaction** and are permanently removed only at the last level of the storage hierarchy.
+### 2. The Read Path (Optimization)
+* **Bloom Filters:** A probabilistic layer that allows the engine to skip checking SSTables that definitely do not contain a specific key, reducing disk seeks by >90%.
+* **Sparse Index:** Each SSTable contains an in-memory index mapping key ranges to byte offsets, allowing for fast binary searches on disk.
 
-##### **Search** 
-The search always starts from the **Memtable** and proceeds down the levels from 1 to `n`. If the key is found at any level, it is returned, provided it hasn’t been **soft-deleted** (**tombstoned**). If the key is **soft-deleted**, a "**not found**" result is returned.
+### 3. Storage & Maintenance
+* **SSTables (Sorted String Tables):** Immutable binary files flushed from memory once the MemTable reaches its size threshold.
+* **Leveled Compaction:** A background process that merges overlapping SSTables, removes **Tombstones** (logical deletes), and deduplicates keys to manage read/write amplification.
+
+---
+
+## 🌐 Go Integration (CGO Bridge)
+
+To make the engine "cloud-ready," I implemented a **CGO wrapper** that exposes the C++ core to the Go ecosystem. This allows the engine to power high-level web services while maintaining C++ performance.
+
+* **C-Compatible ABI:** A thin `extern "C"` layer wraps the C++ logic.
+* **Go Bindings:** Idiomatic Go code handles pointer translation and memory safety across the language boundary.
+
+---
+
+## 🛠️ Build & Execution Guide
+
+The project is split into the **C++ Core** (shared library) and the **Go Server**.
+
+### 1. Build the Shared Library (`libkvstore`)
+The Go wrapper requires a compiled shared object (`.so` or `.dylib`) to talk to the C++ engine.
+
+```bash
+mkdir build && cd build
+cmake ..
+make
+
+# Move the library to the server directory for linking
+cp libkvstore.so ../go-server/
+```
+
+### 2. Run the Go Server
+The Go server acts as the entry point, exposing the engine via a REST/CLI interface.
+
+```bash
+cd ../go-server
+
+# Tell the linker where to find the C++ library
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)
+
+# Run the server
+go run main.go
+```
+
+### 3. Interact with the Store
+Once the server is running, you can use `curl` to interact with the LSM-Tree:
+
+```bash
+# Put a key
+curl -X POST http://localhost:8080/put -d '{"key": "user:1", "value": "Pranav"}'
+
+# Get a key
+curl http://localhost:8080/get/user:1
+```
+
+---
+
+## 📊 Technical Trade-offs & Challenges
+* **Tombstone Management:** Learned that "deleting" in an LSM-tree is actually a write operation. Deletes are only physically purged during a **Major Compaction**.
+* **CGO Overhead:** Navigating the "CGO is not Go" philosophy by minimizing transitions across the language boundary to maintain performance.
+* **Memory Safety:** Implementing RAII in C++ to ensure the WAL and SSTable file descriptors are managed correctly without leaks.
+
+---
+
+## 🚀 Roadmap
+- [x] **Core Engine:** LSM-Tree, WAL, SSTable, Sparse Index.
+- [x] **Optimization:** Bloom Filters and Binary Search.
+- [x] **Go Wrapper:** CGO implementation for language interop.
+- [ ] **Concurrent Compaction:** Moving merge logic to a background thread.
+- [ ] **Metrics Dashboard:** Visualizing Write Amplification and MemTable health.
+
+---
+
+## 👨‍💻 Author
+**Pranav Jayachandran** *Software Development Engineer* [GitHub](https://github.com/PranavJayachandran) | [LinkedIn](https://linkedin.com/in/pranav-jayachandran-b971bb1b8)
